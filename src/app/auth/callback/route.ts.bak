@@ -1,0 +1,90 @@
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+
+export async function GET(request: Request) {
+  const { searchParams, origin } = new URL(request.url);
+  const code = searchParams.get('code');
+  const token_hash = searchParams.get('token_hash');
+  const type = searchParams.get('type') as 'email' | 'recovery' | null;
+  const next = searchParams.get('next') ?? '/dashboard/portfolio';
+
+  const cookieStore = await cookies();
+
+  // Track cookies that need to be set on the response
+  const responseCookies: { name: string; value: string; options: Record<string, unknown> }[] = [];
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          console.log('[AUTH CALLBACK] setAll called with', cookiesToSet.length, 'cookies');
+          cookiesToSet.forEach(({ name, value, options }) => {
+            console.log('[AUTH CALLBACK] Cookie:', name);
+            responseCookies.push({ name, value, options });
+            // Also try setting on cookieStore directly
+            try {
+              cookieStore.set(name, value, options);
+            } catch (e) {
+              console.log('[AUTH CALLBACK] cookieStore.set error:', e);
+            }
+          });
+        },
+      },
+    }
+  );
+
+  let redirectUrl = `${origin}/login?error=auth_callback_error`;
+
+  // Handle PKCE flow (OAuth and magic links via Supabase redirect)
+  if (code) {
+    console.log('[AUTH CALLBACK] Exchanging code for session...');
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+    console.log('[AUTH CALLBACK] Exchange result:', { hasSession: !!data?.session, error: error?.message });
+    if (!error && data?.session) {
+      redirectUrl = `${origin}${next}`;
+    }
+  }
+  // Handle direct OTP flow (magic link with token_hash)
+  else if (token_hash && type) {
+    console.log('[AUTH CALLBACK] Verifying OTP...');
+    const { data, error } = await supabase.auth.verifyOtp({ token_hash, type });
+    console.log('[AUTH CALLBACK] OTP result:', { hasSession: !!data?.session, error: error?.message });
+    if (!error && data?.session) {
+      redirectUrl = `${origin}${next}`;
+    }
+  }
+
+  console.log('[AUTH CALLBACK] Cookies collected:', responseCookies.length);
+
+  // If no cookies were set by Supabase, something is wrong
+  if (responseCookies.length === 0) {
+    console.log('[AUTH CALLBACK] WARNING: No cookies were set by Supabase!');
+  }
+
+  // Create response with redirect
+  const response = NextResponse.redirect(redirectUrl);
+
+  // Set cookies on the response
+  responseCookies.forEach(({ name, value, options }) => {
+    response.cookies.set({
+      name,
+      value,
+      path: (options.path as string) || '/',
+      maxAge: options.maxAge as number | undefined,
+      domain: options.domain as string | undefined,
+      secure: options.secure as boolean | undefined,
+      httpOnly: options.httpOnly as boolean | undefined,
+      sameSite: options.sameSite as 'lax' | 'strict' | 'none' | undefined,
+    });
+  });
+
+  console.log('[AUTH CALLBACK] Response cookies set:', response.cookies.getAll().map(c => c.name));
+
+  return response;
+}
