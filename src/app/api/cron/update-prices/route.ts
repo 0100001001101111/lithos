@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase';
-import { scrapeStrategicMetalsInvest, getFallbackPrices } from '@/lib/scrapers/strategic-metals';
-import { getCollectibleFallbackPrices, addPriceVariation } from '@/lib/scrapers/collectibles';
+import { scrapeSMMPrices, getSMMSnapshotPrices } from '@/lib/scrapers/smm-metals';
+import { scrapeEbayPrices, getEbaySnapshotPrices } from '@/lib/scrapers/ebay-collectibles';
 
 // Verify cron secret to prevent unauthorized access
 function verifyCronSecret(request: NextRequest): boolean {
@@ -26,25 +26,35 @@ export async function GET(request: NextRequest) {
   const results = {
     success: [] as string[],
     failed: [] as string[],
+    scraped: 0,
+    snapshot: 0,
     timestamp: new Date().toISOString(),
   };
 
   try {
-    // Try scraping, fall back to static prices if it fails
-    let metalPrices = await scrapeStrategicMetalsInvest();
+    // Try scraping real SMM prices first
+    console.log('Attempting to scrape SMM prices...');
+    let metalPrices = await scrapeSMMPrices();
+
     if (metalPrices.length === 0) {
-      console.log('Scraping failed, using fallback prices');
-      metalPrices = getFallbackPrices().map((p) => ({
-        ...p,
-        price_usd: addPriceVariation(p.price_usd),
-      }));
+      console.log('SMM scraping returned no results, using snapshot prices');
+      metalPrices = getSMMSnapshotPrices();
+      results.snapshot += metalPrices.length;
+    } else {
+      results.scraped += metalPrices.length;
     }
 
-    // Get collectible prices (with variation for demo)
-    const collectiblePrices = getCollectibleFallbackPrices().map((p) => ({
-      ...p,
-      price_usd: addPriceVariation(p.price_usd),
-    }));
+    // Try scraping real eBay prices
+    console.log('Attempting to scrape eBay prices...');
+    let collectiblePrices = await scrapeEbayPrices();
+
+    if (collectiblePrices.length === 0) {
+      console.log('eBay scraping returned no results, using snapshot prices');
+      collectiblePrices = getEbaySnapshotPrices();
+      results.snapshot += collectiblePrices.length;
+    } else {
+      results.scraped += collectiblePrices.length;
+    }
 
     // Combine all prices
     const allPrices = [...metalPrices, ...collectiblePrices];
