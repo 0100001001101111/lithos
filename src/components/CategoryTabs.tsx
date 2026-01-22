@@ -10,6 +10,7 @@ const categories = [
   { id: 'strategic_metal', label: 'Strategic Metals' },
   { id: 'rare_earth', label: 'Rare Earths' },
   { id: 'collectible', label: 'Collectibles' },
+  { id: 'movers', label: '🔥 Movers' },
 ];
 
 export default function CategoryTabs({ activeCategory, onCategoryChange }: CategoryTabsProps) {

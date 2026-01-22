@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Material, Price, News } from '@/types';
 import PriceTable from '@/components/PriceTable';
 import NewsFeed from '@/components/NewsFeed';
 import CategoryTabs from '@/components/CategoryTabs';
+import TrendingBar from '@/components/TrendingBar';
+import { calculateTrending, filterMovers } from '@/lib/trending';
 
 interface MaterialWithPrices extends Material {
   prices: Price[];
@@ -18,9 +20,15 @@ interface HomeClientProps {
 export default function HomeClient({ materials, news }: HomeClientProps) {
   const [activeCategory, setActiveCategory] = useState('all');
 
-  const filteredMaterials = activeCategory === 'all'
-    ? materials
-    : materials.filter((m) => m.category === activeCategory);
+  // Calculate trending data
+  const trending = useMemo(() => calculateTrending(materials), [materials]);
+
+  // Filter materials based on active category
+  const filteredMaterials = useMemo(() => {
+    if (activeCategory === 'all') return materials;
+    if (activeCategory === 'movers') return filterMovers(materials, 5);
+    return materials.filter((m) => m.category === activeCategory);
+  }, [materials, activeCategory]);
 
   // Calculate some stats for the header
   const totalMaterials = materials.length;
@@ -63,6 +71,9 @@ export default function HomeClient({ materials, news }: HomeClientProps) {
           <div className="text-sm text-[var(--text-secondary)]">Collectibles</div>
         </div>
       </div>
+
+      {/* Trending section */}
+      <TrendingBar gainers={trending.gainers} losers={trending.losers} />
 
       {/* Main content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
