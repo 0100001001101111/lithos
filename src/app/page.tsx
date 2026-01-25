@@ -19,7 +19,27 @@ async function getMaterials() {
   return materials as Material[];
 }
 
-async function getPrices() {
+// Fetch recent prices for % change calculations
+// Gets enough historical data to calculate 24h, 7d, and 30d changes
+async function getPricesForCalculations() {
+  // Fetch all prices, ordered by date (most recent first)
+  // We'll limit to top 20 per material in JavaScript
+  const { data: prices, error } = await supabase
+    .from('lithos_prices')
+    .select('*')
+    .order('recorded_at', { ascending: false })
+    .limit(3000); // Get plenty of data for all materials
+
+  if (error) {
+    console.error('Error fetching prices for calculations:', error);
+    return [];
+  }
+
+  return prices as Price[];
+}
+
+// Fetch 30-day prices for chart visualization
+async function getChartPrices() {
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -30,7 +50,7 @@ async function getPrices() {
     .order('recorded_at', { ascending: false });
 
   if (error) {
-    console.error('Error fetching prices:', error);
+    console.error('Error fetching chart prices:', error);
     return [];
   }
 
@@ -53,17 +73,32 @@ async function getNews() {
 }
 
 export default async function Home() {
-  const [materials, prices, news] = await Promise.all([
+  const [materials, calcPrices, chartPrices, news] = await Promise.all([
     getMaterials(),
-    getPrices(),
+    getPricesForCalculations(),
+    getChartPrices(),
     getNews(),
   ]);
 
   // Combine materials with their prices
-  const materialsWithPrices = materials.map((material) => ({
-    ...material,
-    prices: prices.filter((p) => p.material_slug === material.slug),
-  }));
+  // Use calculation prices (top 20 most recent per material) for % change calculations
+  // Chart prices are used for sparkline visualization
+  const materialsWithPrices = materials.map((material) => {
+    const materialCalcPrices = calcPrices
+      .filter((p) => p.material_slug === material.slug)
+      .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime())
+      .slice(0, 20); // Limit to 20 most recent prices per material
+
+    const materialChartPrices = chartPrices
+      .filter((p) => p.material_slug === material.slug)
+      .sort((a, b) => new Date(b.recorded_at).getTime() - new Date(a.recorded_at).getTime());
+
+    return {
+      ...material,
+      prices: materialCalcPrices, // For % change calculations (historical data)
+      chartPrices: materialChartPrices, // For sparkline (30-day data)
+    };
+  });
 
   return <HomeClient materials={materialsWithPrices} news={news} />;
 }

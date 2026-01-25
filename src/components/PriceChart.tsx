@@ -166,6 +166,17 @@ export default function PriceChart({ prices, unit }: PriceChartProps) {
               stroke={chartColor}
               strokeWidth={2}
               fill="url(#colorPrice)"
+              dot={{
+                r: filteredData.length <= 20 ? 4 : 0,
+                fill: chartColor,
+                strokeWidth: 0,
+              }}
+              activeDot={{
+                r: 6,
+                fill: chartColor,
+                stroke: '#161b22',
+                strokeWidth: 2,
+              }}
             />
           </AreaChart>
         </ResponsiveContainer>

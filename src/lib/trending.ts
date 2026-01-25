@@ -35,8 +35,9 @@ export function calculateTrending(materials: MaterialWithPrices[]): TrendingData
         ? ((current - yesterday) / yesterday) * 100
         : 0;
 
-      // Skip items with no change
+      // Skip items with no change or extreme changes (data artifacts)
       if (change_24h === 0) return null;
+      if (Math.abs(change_24h) > 200) return null;
 
       return {
         slug: m.slug,

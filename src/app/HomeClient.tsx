@@ -9,7 +9,8 @@ import TrendingBar from '@/components/TrendingBar';
 import { calculateTrending, filterMovers } from '@/lib/trending';
 
 interface MaterialWithPrices extends Material {
-  prices: Price[];
+  prices: Price[];      // Historical prices for % change calculations
+  chartPrices?: Price[]; // 30-day prices for sparkline charts
 }
 
 interface HomeClientProps {

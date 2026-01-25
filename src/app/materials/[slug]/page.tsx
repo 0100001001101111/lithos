@@ -28,10 +28,21 @@ async function getPrices(slug: string) {
     .select('*')
     .eq('material_slug', slug)
     .order('recorded_at', { ascending: false })
-    .limit(365); // Up to a year of data
+    .limit(365); // Up to a year of data for chart
 
   if (error) return [];
   return prices as Price[];
+}
+
+// Get ALL prices for ATH/ATL stats (no limit)
+async function getAllPricesForStats(slug: string): Promise<number[]> {
+  const { data: prices, error } = await supabase
+    .from('lithos_prices')
+    .select('price_usd')
+    .eq('material_slug', slug);
+
+  if (error || !prices) return [];
+  return prices.map((p) => p.price_usd);
 }
 
 async function getRelatedNews(slug: string) {
@@ -61,12 +72,34 @@ function formatPrice(price: number | null, unit: string): string {
   return `$${price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / ${unit}`;
 }
 
+// Get ATH/ATL with outlier filtering
+// - ATL: Use 5th percentile to filter out bad low data (like $0.07 misclassified auctions)
+// - ATH: Use actual maximum (historical peaks like $30+ from 2006 are genuine, not outliers)
+function getFilteredStats(arr: number[]): { high: number | null; low: number | null; avg: number | null } {
+  if (arr.length === 0) return { high: null, low: null, avg: null };
+
+  const sorted = [...arr].sort((a, b) => a - b);
+
+  // For ATL: use 5th percentile to filter out extremely low outliers (bad data)
+  const lowIndex = Math.max(0, Math.floor(sorted.length * 0.05));
+  const allTimeLow = sorted[lowIndex];
+
+  // For ATH: use actual maximum (historical peaks are genuine data, not outliers)
+  const allTimeHigh = sorted[sorted.length - 1];
+
+  // Average uses all data
+  const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+
+  return { high: allTimeHigh, low: allTimeLow, avg };
+}
+
 export default async function MaterialPage({ params }: PageProps) {
   const { slug } = await params;
-  const [material, prices, news] = await Promise.all([
+  const [material, prices, news, allPrices] = await Promise.all([
     getMaterial(slug),
     getPrices(slug),
     getRelatedNews(slug),
+    getAllPricesForStats(slug), // Fetch ALL prices for ATH/ATL stats
   ]);
 
   if (!material) {
@@ -74,12 +107,13 @@ export default async function MaterialPage({ params }: PageProps) {
   }
 
   const currentPrice = prices[0]?.price_usd || null;
-  const pricesArray = prices.map((p) => p.price_usd);
-  const allTimeHigh = pricesArray.length > 0 ? Math.max(...pricesArray) : null;
-  const allTimeLow = pricesArray.length > 0 ? Math.min(...pricesArray) : null;
-  const avgPrice = pricesArray.length > 0
-    ? pricesArray.reduce((a, b) => a + b, 0) / pricesArray.length
-    : null;
+
+  // Use ALL historical prices for ATH/ATL stats with IQR outlier filtering
+  // This preserves genuine historical peaks while removing bad data
+  const stats = getFilteredStats(allPrices);
+  const allTimeHigh = stats.high;
+  const allTimeLow = stats.low;
+  const avgPrice = stats.avg;
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WorthPoint Scraper Bookmarklet</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        h1 { color: #333; }
+        .bookmarklet { display: inline-block; padding: 12px 24px; background: #4CAF50; color: white; text-decoration: none; border-radius: 6px; font-weight: bold; margin: 20px 0; }
+        .bookmarklet:hover { background: #45a049; }
+        code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+        pre { background: #f4f4f4; padding: 15px; border-radius: 6px; overflow-x: auto; }
+        .step { margin: 15px 0; padding-left: 20px; }
+        .commands { background: #e8f5e9; padding: 15px; border-radius: 6px; margin: 20px 0; }
+        .warning { background: #fff3e0; padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #ff9800; }
+    </style>
+</head>
+<body>
+    <h1>WorthPoint Scraper Bookmarklet</h1>
+
+    <p>Drag this button to your bookmarks bar:</p>
+
+    <a class="bookmarklet" href="javascript:(function(){window.WP=window.WP||{};var S='worthpoint_scraper_data',T='worthpoint_scraper_seen';function g(k){try{return JSON.parse(localStorage.getItem(k)||'[]')}catch(e){return[]}}function s(k,v){localStorage.setItem(k,JSON.stringify(v))}function w(t){var p=[[/(\d+\.?\d*)\s*[Gg](?:rams?)?/i,1],[ /(\d+\.?\d*)-[Gg]/i,1],[/(\d+\.?\d*)\s*ct/i,.2],[/(\d+\.?\d*)\s*oz/i,28.35],[/(\d+\.?\d*)\s*kg/i,1e3]];for(var i=0;i<p.length;i++){var m=t.match(p[i][0]);if(m){var v=parseFloat(m[1])*p[i][1];if(v>.01&&v<1e5)return Math.round(v*1e3)/1e3}}return null}function d(s){if(!s)return null;var x=new Date(s);return isNaN(x)?s:x.toISOString().split('T')[0]}var q=new URLSearchParams(location.search).get('query')||'unknown';var slug=q.toLowerCase().replace(/\s+/g,'-');var data=g(S),seen=new Set(g(T)),n=0;document.querySelectorAll('.search-result').forEach(function(el){var title='',img=el.querySelector('.item-link img');if(img&&img.alt)title=img.alt;var pe=el.querySelector('.price .result'),price=pe?pe.innerText.trim():null;var de=el.querySelector('.sold-date .result'),date=de?de.innerText.trim():null;if(title&&price){var k=title.toLowerCase().slice(0,60);if(!seen.has(k)){seen.add(k);var pv=parseFloat(price.replace(/[$,]/g,''));if(!isNaN(pv)){var wt=w(title),ppg=wt?Math.round(pv/wt*100)/100:null;data.push({material_slug:slug,title:title,price_usd:pv,sale_date:d(date),weight_grams:wt,price_per_gram:ppg,source:'WorthPoint'});n++}}}});s(S,data);s(T,[...seen]);var off=parseInt(new URLSearchParams(location.search).get('offset')||'0');alert('WorthPoint Scraper\\n\\nPage '+(Math.floor(off/20)+1)+': '+n+' new items\\nTotal: '+data.length+'\\n\\nClick Next page and run again.\\nWhen done: WP.download() in console');WP.download=function(){var d=g(S);if(!d.length)return alert('No data');var h=['material_slug','title','price_usd','sale_date','weight_grams','price_per_gram','source'];var csv=h.join(',')+String.fromCharCode(10);d.forEach(function(r){csv+=h.map(function(k){var v=r[k];if(v==null)return'';v=String(v);return v.indexOf(',')>=0||v.indexOf('\"')>=0?'\"'+v.replace(/\"/g,'\"\"')+'\"':v}).join(',')+String.fromCharCode(10)});var b=new Blob([csv],{type:'text/csv'});var a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(d[0].material_slug||'data')+'.csv';a.click()};WP.clear=function(){localStorage.removeItem(S);localStorage.removeItem(T);alert('Data cleared')};WP.count=function(){return g(S).length}})();">📊 WP Scrape</a>
+
+    <h2>Instructions</h2>
+
+    <div class="step"><strong>1.</strong> Drag the green button above to your bookmarks bar</div>
+    <div class="step"><strong>2.</strong> Log into <a href="https://www.worthpoint.com" target="_blank">WorthPoint</a></div>
+    <div class="step"><strong>3.</strong> Search for a material (e.g., "Darwin Glass" in Natural History)</div>
+    <div class="step"><strong>4.</strong> Click the bookmarklet - it will extract data and show a count</div>
+    <div class="step"><strong>5.</strong> Click "Next" to go to the next page</div>
+    <div class="step"><strong>6.</strong> Repeat steps 4-5 until all pages are done</div>
+    <div class="step"><strong>7.</strong> Open DevTools Console (Cmd+Option+J) and run <code>WP.download()</code></div>
+
+    <div class="commands">
+        <strong>Console Commands:</strong>
+        <ul>
+            <li><code>WP.download()</code> - Download all collected data as CSV</li>
+            <li><code>WP.clear()</code> - Clear stored data (run between different materials)</li>
+            <li><code>WP.count()</code> - Show count of collected items</li>
+        </ul>
+    </div>
+
+    <div class="warning">
+        <strong>Important:</strong> Run <code>WP.clear()</code> in console before starting a new material, otherwise data will mix together.
+    </div>
+
+    <h2>Materials to Scrape</h2>
+    <p>Search for these on WorthPoint (Natural History category):</p>
+    <ul>
+        <li>Darwin Glass</li>
+        <li>trinitite</li>
+        <li>Allende meteorite</li>
+        <li>indochinite tektite</li>
+        <li>NWA martian meteorite</li>
+        <li>muonionalusta meteorite</li>
+        <li>NWA lunar meteorite</li>
+        <li>Libyan Desert Glass</li>
+        <li>Sikhote-Alin meteorite</li>
+        <li>Campo del Cielo meteorite</li>
+        <li>KT boundary</li>
+    </ul>
+
+    <h2>After Scraping</h2>
+    <p>Move the downloaded CSV files to <code>~/lithos/scripts/worthpoint-data/</code> then run:</p>
+    <pre>python3 import-worthpoint-to-supabase.py</pre>
+</body>
+</html>

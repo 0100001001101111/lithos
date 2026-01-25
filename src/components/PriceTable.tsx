@@ -5,7 +5,8 @@ import { Material, Price } from '@/types';
 import Sparkline from './Sparkline';
 
 interface MaterialWithPriceData extends Material {
-  prices: Price[];
+  prices: Price[];       // Historical prices for % change calculations
+  chartPrices?: Price[]; // 30-day prices for sparkline charts
 }
 
 interface PriceTableProps {
@@ -35,6 +36,11 @@ function calculateChange(prices: Price[], days: number): number | null {
 
 function PriceChange({ value }: { value: number | null }) {
   if (value === null) return <span className="text-[var(--text-secondary)]">—</span>;
+
+  // Cap at ±200% - display N/A for extreme changes (likely data correction artifacts)
+  if (Math.abs(value) > 200) {
+    return <span className="text-[var(--text-secondary)]">N/A</span>;
+  }
 
   const isPositive = value > 0;
   const isNeutral = Math.abs(value) < 0.01;
@@ -118,7 +124,7 @@ export default function PriceTable({ materials }: PriceTableProps) {
                   <PriceChange value={change30d} />
                 </td>
                 <td className="py-4">
-                  <Sparkline data={material.prices.slice(0, 30).reverse()} />
+                  <Sparkline data={(material.chartPrices || material.prices).slice(0, 30).reverse()} />
                 </td>
               </tr>
             );
